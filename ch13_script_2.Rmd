@@ -20,6 +20,7 @@ library(gganimate)
 library(rpart.plot)
 library(tidymodels)
 library(tidyverse)
+library(randomForest)
 
 # tidymodels really wants your dependent variable to be a factor. After all, you
 # have told tidymodels that it is not really a number --- it is a category with
@@ -46,11 +47,30 @@ We are using the [**tidymodels** collection of packages](https://www.tidymodels.
 
 Useful functions include `logistic_reg()`, `set_engine()`, and `fit()`.
 
+```{r}
+
+logistic_mod <- logistic_reg() %>%
+  set_engine("glm")
+
+logistic_fit <- fit(logistic_mod,
+                    factor(vote) ~ ideology + income + gender + race,
+                    data = nes)
+
+logistic_fit$fit %>%
+  tidy(conf.int = TRUE) %>%
+  select(term, estimate, conf.low, conf.high)
+
+
+```
+
+
 Interpret the coefficient of `income`.
+
+The coefficient of income is that for every single income level increase, there will be a `-0.21517677/4` decrease in the vote(so more likely to vote Republican).
 
 Write a sentence to your smart-but-not-mathematical boss which explains the association of income with preference for the Democratic candidate. Include a notion of uncertainty.
 
-
+Richer folks don't like the dems as much, we're 95% sure of this broa
 
 # Scene 2
 
@@ -58,11 +78,31 @@ Write a sentence to your smart-but-not-mathematical boss which explains the asso
 
 Hint: In addition to the functions you used in Scene 1, you may find `set_mode()` and `prp()` to be helpful.
 
+
+```{r}
+
+tree_mod <- decision_tree() %>%
+  set_engine("rpart",
+             model = TRUE) %>%
+  set_mode("classification")
+
+house_region_tree <- fit(tree_mod,
+                        factor(vote) ~ ideology + income + gender + race,
+                        data = nes)
+
+
+house_region_tree$fit %>%
+  prp(extra = 6, varlen = 0, faclen = 0 )
+
+```
+
 Print the fitted model.
 
 Plot the fitted model. You may find the `prp()` function to be useful. I like `extra = 6` as an argument. Read the help page to understand what it means.
 
 Write two sentences explaining to your smart-but-not-mathematical boss what the model means and how he should interpret it. Make sure to discuss why some variables, like gender, are not used in the model. He thinks that gender matters to voting!
+
+
 
 Optional: Can you write a simple dplr pipe which does, more or less, what the CART is doing, at least for the first node, and then confirms the numbers in the plot?
 
@@ -74,6 +114,31 @@ Optional: Can you write a simple dplr pipe which does, more or less, what the CA
 **Prompt:** Following [the approach](https://davidkane9.github.io/PPBDS/13-classification.html#random-forests) outlined in the *Primer*, use **tidymodels** to estimate a random forest model in which `vote` is the dependent variable and `ideology`, `income`, `gender`, and `race` are the independent variables. 
 
 Hint: In addition to the functions you used in Scenes 1 and 2, you may find `rand_forest()` to be helpful.
+
+```{r}
+forest_mod <- rand_forest() %>%
+  set_engine("randomForest") %>%
+  set_mode("classification")
+
+house_forest <- fit(forest_mod,
+                    factor(vote) ~ ideology + income + gender + race,
+                        data = nes)
+
+house_forest
+
+```
+```{r}
+
+tibble(`Error rate` = house_forest$fit$err.rate[, "00B"],
+       Trees = 1:5000) %>%
+  ggplot(aes(x = Trees, y = `Error rate`)) +
+  geom_line() +
+  theme_classic()
+
+
+
+
+```
 
 Print out and interpret the model.
 
@@ -90,6 +155,8 @@ What is OOB error?
 1. Use the models we have already estimated.
 
 2. Add columns of each model's prediction on `nes` by using `mutate` on `nes`. You should use `predict` and feed it the saved model and `new_data = nes`. `pull()` the `.pred_class` from the prediction. 
+
+
 
 3. Create a tibble with the accuracy of the prediction columns of each model.
 
